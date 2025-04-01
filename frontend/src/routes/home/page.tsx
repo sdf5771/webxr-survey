@@ -98,6 +98,7 @@ function Home(){
             const elementContainerMaterial = new THREE.MeshBasicMaterial({
                 map: imageTexture,
                 side: THREE.DoubleSide,
+                transparent: true,
                 color: 0xffffff // 기본 색상 설정
             });
 
