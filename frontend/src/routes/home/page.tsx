@@ -1,6 +1,15 @@
 import React, { useEffect } from 'react';
 import styles from './page.module.css';
 import * as THREE from 'three';
+
+// contorls
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+
+// model loader
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 // 로컬 이미지 파일 import
@@ -49,7 +58,7 @@ function Home(){
         document.body.appendChild(VRButton.createButton(renderer)); // VR Button
 
         // 조명 추가
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        const ambientLight = new THREE.AmbientLight(0x78ff00, 0.5);
         scene.add(ambientLight);
         
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -65,6 +74,108 @@ function Home(){
         scene.add(axesHelper);
 
         console.log("요소 생성 시작");
+
+        // 상호작용하게 만들 객체 배열
+        const interactiveObjects: THREE.Object3D[] = [];
+
+        // Create Raycaster
+        const raycaster = new THREE.Raycaster();
+        const tempMatrix = new THREE.Matrix4();
+
+        // Apple Vision Pro
+        // Hand Model
+        const handModelFactory = new XRHandModelFactory();
+
+        const hand1 = renderer.xr.getHand(0);
+        hand1.add(handModelFactory.createHandModel(hand1));
+        scene.add(hand1);
+
+        const hand2 = renderer.xr.getHand(1);
+        hand2.add(handModelFactory.createHandModel(hand2));
+        scene.add(hand2);
+
+        // 시선 커서(Gaze Cursor) 추가
+        const gazeCursor = new THREE.Mesh(
+            new THREE.RingGeometry(0.02, 0.03, 32),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true })
+        );
+        gazeCursor.position.z = -2;
+        camera.add(gazeCursor);
+        scene.add(camera);
+        
+        // 시선 기반 레이캐스팅
+        function updateGaze() {
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(interactiveObjects);
+            
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                console.log('충돌 감지된 오브젝트 :', object.name, object.userData);
+                gazeCursor.material.color.set(0xff0000);
+            // 호버링 효과
+            } else {
+                gazeCursor.material.color.set(0x000000);
+            }
+        }
+
+        // model loader
+        const gltfLoader = new GLTFLoader();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/');
+        gltfLoader.setDRACOLoader(dracoLoader);
+
+        gltfLoader.load(
+            '/models/camping-asset-collection.glb',
+            function(gltf) {
+                const model = gltf.scene;
+                scene.add(model);
+
+                interactiveObjects.push(model);
+
+                // 모델 위치 설정
+                model.position.set(0, 1, -1);
+                model.scale.set(1, 1, 1);
+                
+            },
+            undefined,
+            function(err) {
+                console.error('모델 로드 실패:', err);
+            }
+        )
+
+        function onPinchStart(event: any){
+            const controllTarget = event.target;
+
+            tempMatrix.identity().extractRotation(controllTarget.matrixWorld);
+            raycaster.ray.origin.setFromMatrixPosition(controllTarget.matrixWorld);
+            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+            // 요소와 충돌이 되었는지 체크
+            const intersects = raycaster.intersectObjects(interactiveObjects, false);
+
+            if(intersects.length > 0){
+                const object = intersects[0].object;
+                console.log('충돌 감지된 오브젝트 :', object.name, object.userData);
+
+                // 선택된 요소에 반응 추가
+                object.scale.set(1.2, 1.2, 1.2);
+
+                // 시간이 지난 후 원래 사이즈로 변경
+                setTimeout(() => {
+                    object.scale.set(1, 1, 1);
+                }, 1000);
+            }
+        }
+
+        function onPinchEnd(event: any) {
+
+        }
+
+        // hand model의 pinch 감지
+        hand1.addEventListener('pinchstart', onPinchStart);
+        hand1.addEventListener('pinchend', onPinchEnd);
+        hand2.addEventListener('pinchstart', onPinchStart);
+        hand2.addEventListener('pinchend', onPinchEnd);
 
         // Web XR list
         items.forEach((item, index: number) => {
@@ -179,6 +290,7 @@ function Home(){
 
         // 애니메이션 루프 시작
         renderer.setAnimationLoop(() => {
+            updateGaze();
             renderer.render(scene, camera);
         });
 
