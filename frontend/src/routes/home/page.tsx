@@ -111,7 +111,11 @@ function Home(){
             if (intersects.length > 0) {
                 const object = intersects[0].object;
                 console.log('충돌 감지된 오브젝트 :', object.name, object.userData);
+                object.scale.set(1.2, 1.2, 1.2);
                 gazeCursor.material.color.set(0xff0000);
+                setTimeout(() => {
+                    object.scale.set(1, 1, 1);
+                }, 500);
             // 호버링 효과
             } else {
                 gazeCursor.material.color.set(0x000000);
@@ -215,7 +219,7 @@ function Home(){
 
             // 요소 컨테이너 메시 생성
             const elementContainer = new THREE.Mesh(elemenetContainerGeometry, elementContainerMaterial);
-
+            interactiveObjects.push(elementContainer);
             // 요소 컨테이너 위치 설정
             elementContainer.position.x = (index - 1) * 5; // 간격 늘림
             elementContainer.position.y = 1.5; // 높이를 올려서 그리드 위에 표시
